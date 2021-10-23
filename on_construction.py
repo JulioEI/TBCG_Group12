@@ -9,13 +9,11 @@ import bcg_auxiliary as bcg
 #import matplotlib.pyplot as plt
 import numpy as np
 
-
-
-datapath = "data/Som2"
+datapath = "../data/Som2"
 data_Som2, fs, session_name_Som2 = bcg.load_data(datapath)
 ripples_tags_Som2 = bcg.load_ripples_tags(datapath, fs)
 
-datapath = "data/Amigo2"
+datapath = "../data/Amigo2"
 data_Amigo2, fs, session_name_Amigo2 = bcg.load_data(datapath)
 ripples_tags_Amigo2 = bcg.load_ripples_tags(datapath, fs)
 
@@ -24,6 +22,16 @@ n_ch = data_Som2.shape[1]
 desired_fs = 1250
 down_sampling_factor =int(fs/desired_fs)
 
+
+def mov_av_downsample(array, win):
+    desired_length = int(win*np.ceil(array.shape[0]/win))
+    array = np.pad(array.astype(float), ((0, desired_length-array.shape[0]), (0, 0)), 
+                  mode='constant', constant_values=np.nan)
+    return np.nanmean(array.reshape(-1, win, array.shape[1]),axis= 1)
+
+    # return np.convolve(array, (1.0 /win) * np.ones(win,), mode='valid')[::win,:]
+    
+    
 def downsample(array, factor):
     desired_length = int(factor*np.ceil(array.shape[0]/factor))
     padding_array = np.empty((desired_length-array.shape[0], array.shape[1]))
@@ -31,19 +39,17 @@ def downsample(array, factor):
     array = np.vstack((array, padding_array))
     return np.nanmean(array.reshape(-1, factor, array.shape[1]),axis= 1)
 
-
-data_Som2 = downsample(data_Som2, down_sampling_factor)
-signal_Som2 = bcg.get_ripples_tags_as_signal(data_Som2, ripples_tags_Som2,desired_fs)
-
-data_Amigo2 = downsample(data_Amigo2, down_sampling_factor)
-signal_Amigo2 = bcg.get_ripples_tags_as_signal(data_Amigo2, ripples_tags_Amigo2, desired_fs)
-fs = desired_fs
-
-
-
-window_seconds = 0.04 #seconds
-input_shape = (int(fs*window_seconds),8,1)
-
+def window_stack(a, stepsize, width):
+    n = a.shape[0]
+    new_mat = np.zeros((np.ceil(n/stepsize).astype(int), width, a.shape[1]),dtype=np.int16)
+    ind = 0
+    for window in range(new_mat.shape[0]):
+        new_mat[window,:,:] = np.expand_dims(a[ind:ind+width,:], axis=0)
+        ind = ind+stepsize
+        if ind+width>n:
+            ind = n-width
+            print(ind, ind+width, a.shape[0])
+    return new_mat
 
 def window_stack(a, stepsize, width):
     n = a.shape[0]
@@ -58,6 +64,16 @@ def window_stack(a, stepsize, width):
             break
     return new_mat
 
+data_Som2 = mov_av_downsample(data_Som2, down_sampling_factor)
+signal_Som2 = bcg.get_ripples_tags_as_signal(data_Som2, ripples_tags_Som2,desired_fs)
+
+data_Amigo2 = mov_av_downsample(data_Amigo2, down_sampling_factor)
+signal_Amigo2 = bcg.get_ripples_tags_as_signal(data_Amigo2, ripples_tags_Amigo2, desired_fs)
+fs = desired_fs
+
+
+window_seconds = 0.04 #seconds
+input_shape = (int(fs*window_seconds),8,1)
 
 overlapping = 0.6
 x_train = np.expand_dims(window_stack(np.vstack((data_Som2,data_Amigo2)), 
