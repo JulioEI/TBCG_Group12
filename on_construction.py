@@ -9,6 +9,10 @@ import bcg_auxiliary as bcg
 #import matplotlib.pyplot as plt
 import numpy as np
 
+import sys
+path_to_module = r"E:\\Users\Usuario\\Documents\\TheBrainCodeGame\\TBCG_SocioAstros\\"
+sys.path.append(path_to_module)
+import utils as ut
 
 
 datapath = "data/Som2"
@@ -116,5 +120,17 @@ model.compile(
 )
 
 model.fit(x_train,y_train, shuffle = True, epochs = 1, batch_size = 32)
+
+t = np.linspace(0, signal_Som2.shape[0]+signal_Amigo2.shape[0]-1, signal_Som2.shape[0]+signal_Amigo2.shape[0], dtype=int)
+t_window = window_stack(np.expand_dims(t,axis=1), int((1-overlapping)*input_shape[0]), int(input_shape[0]))
+
+y_predicted = model.predict(x_train[:150,:,:,:])
+y_truth = y_train[:150,:]
+t_predicted = t_window[:150,:,:]
+
+
+events = ut.get_ripple_times_from_CNN_output(y_train[:2000,:], t_window[:2000], fs = fs, verbose = False)   
+            
+
 
 
