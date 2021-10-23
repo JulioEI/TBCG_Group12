@@ -9,84 +9,42 @@ import bcg_auxiliary as bcg
 #import matplotlib.pyplot as plt
 import numpy as np
 
+import sys
+path_to_module = r"E:\\Users\Usuario\\Documents\\TheBrainCodeGame\\TBCG_SocioAstros\\"
+sys.path.append(path_to_module)
+import utils as ut
+
+
 datapath = "../data/Som2"
 data_Som2, fs, session_name_Som2 = bcg.load_data(datapath)
+n_ch = data_Som2.shape[1]
 ripples_tags_Som2 = bcg.load_ripples_tags(datapath, fs)
 
 datapath = "../data/Amigo2"
 data_Amigo2, fs, session_name_Amigo2 = bcg.load_data(datapath)
 ripples_tags_Amigo2 = bcg.load_ripples_tags(datapath, fs)
 
-n_ch = data_Som2.shape[1]
 #downsample
 desired_fs = 1250
+window_seconds = 0.04 #seconds
+overlapping = 0.6
+
 down_sampling_factor =int(fs/desired_fs)
+window_size = int(desired_fs*window_seconds)
+input_shape = (window_size,n_ch,1)
 
-
-def mov_av_downsample(array, win):
-    desired_length = int(win*np.ceil(array.shape[0]/win))
-    array = np.pad(array.astype(float), ((0, desired_length-array.shape[0]), (0, 0)), 
-                  mode='constant', constant_values=np.nan)
-    return np.nanmean(array.reshape(-1, win, array.shape[1]),axis= 1)
-
-    # return np.convolve(array, (1.0 /win) * np.ones(win,), mode='valid')[::win,:]
-    
-    
-def downsample(array, factor):
-    desired_length = int(factor*np.ceil(array.shape[0]/factor))
-    padding_array = np.empty((desired_length-array.shape[0], array.shape[1]))
-    padding_array[:] = np.nan
-    array = np.vstack((array, padding_array))
-    return np.nanmean(array.reshape(-1, factor, array.shape[1]),axis= 1)
-
-def window_stack(a, stepsize, width):
-    n = a.shape[0]
-    new_mat = np.zeros((np.ceil((n-width)/stepsize).astype(int), width, a.shape[1]),dtype=np.int16)
-    ind = 0
-    for window in range(new_mat.shape[0]):
-        new_mat[window,:,:] = np.expand_dims(a[ind:ind+width,:], axis=0)
-        ind = ind+stepsize
-        if ind+width>n:
-            ind = n-width
-            print(ind, ind+width, a.shape[0])
-    return new_mat
-
-
-"""def window_stack(a, stepsize, width):
-    n = a.shape[0]
-    new_mat = np.zeros((np.floor(n/stepsize).astype(int), width, a.shape[1]),dtype=np.int16)
-    ind = 0
-    for window in range(new_mat.shape[0]-1):
-        try:
-            new_mat[window,:,:] = np.expand_dims(a[ind:ind+width,:], axis=0)
-            ind = ind+stepsize
-        except:
-            print(ind, ind+width, a.shape[0])
-            break
-    return new_mat"""
-
-data_Som2 = mov_av_downsample(data_Som2, down_sampling_factor)
+data_Som2 = ut.mov_av_downsample(data_Som2, down_sampling_factor)
 signal_Som2 = bcg.get_ripples_tags_as_signal(data_Som2, ripples_tags_Som2,desired_fs)
+x_train_Som2, indx_map_Som2 = ut.adapt_input_to_CNN(data_Som2, window_size, overlapping)
+y_train_Som2 = ut.adapt_label_to_CNN(signal_Som2, window_size, overlapping)
 
-data_Amigo2 = mov_av_downsample(data_Amigo2, down_sampling_factor)
+data_Amigo2 = ut.mov_av_downsample(data_Amigo2, down_sampling_factor)
 signal_Amigo2 = bcg.get_ripples_tags_as_signal(data_Amigo2, ripples_tags_Amigo2, desired_fs)
+x_train_Amigo2, indx_map_Amigo2 = ut.adapt_input_to_CNN(data_Amigo2, window_size, overlapping)
+y_train_Amigo2 = ut.adapt_label_to_CNN(signal_Amigo2, window_size, overlapping)
+
 fs = desired_fs
 
-
-window_seconds = 0.04 #seconds
-input_shape = (int(fs*window_seconds),8,1)
-
-overlapping = 0.6
-x_train = np.expand_dims(window_stack(np.vstack((data_Som2,data_Amigo2)), 
-                                      int((1-overlapping)*input_shape[0]), int(input_shape[0])),axis=3)
-
-y_train = np.expand_dims(window_stack(np.vstack((np.expand_dims(signal_Som2,axis=1),
-                                     np.expand_dims(signal_Amigo2,axis=1))),
-                                     int((1-overlapping)*input_shape[0]), int(input_shape[0])),axis=3)
-
-
-y_train = np.sum(y_train,axis =1)
-y_train = np.squeeze((y_train>0.7*input_shape[0]).astype(int), axis=2)
 
 from tensorflow.keras.models import Sequential
 from tensorflow.keras import layers
@@ -127,11 +85,36 @@ model.add(layers.Dense(1, activation='relu'))
 model.summary()
 model.build()
 model.compile(
-    optimizer='adam', 
+    optimizer= tf.keras.optimizers.Adam(learning_rate=1e-5), 
     loss='mean_absolute_error', 
     metrics=['mean_absolute_error']  
 )
 
-model.fit(x_train,y_train, shuffle = True, epochs = 1, batch_size = 32)
+
+
+t_train = np.vstack((indx_map_Amigo2[126:190,:,:],indx_map_Amigo2[500:800,:,:], 
+                        indx_map_Amigo2[1000:1300,:,:], indx_map_Amigo2[1900:2200,:,:],
+                        indx_map_Amigo2[2300:2325,:,:], indx_map_Amigo2[2690:2850,:,:], 
+                        indx_map_Amigo2[3000:3350,:,:]))
+
+x_train = np.vstack((x_train_Amigo2[126:190,:,:,:],x_train_Amigo2[500:800,:,:,:], 
+                        x_train_Amigo2[1000:1300,:,:,:], x_train_Amigo2[1900:2200,:,:,:],
+                        x_train_Amigo2[2300:2325,:,:,:], x_train_Amigo2[2690:2850,:,:,:], 
+                        x_train_Amigo2[3000:3350,:,:,:]))
+
+y_train = np.vstack((y_train_Amigo2[126:190],y_train_Amigo2[500:800], 
+                        y_train_Amigo2[1000:1300], y_train_Amigo2[1900:2200],
+                        y_train_Amigo2[2300:2325], y_train_Amigo2[2690:2850], 
+                        y_train_Amigo2[3000:3350]))
+
+
+
+model.fit(x_train,y_train, shuffle = True, epochs = 10, batch_size = 32)
+
+y_predict = model.predict(x_train)
+
+events_predicted = ut.get_ripple_times_from_CNN_output(y_predict, t_train, verbose=True)
+events_truth = ut.get_ripple_times_from_CNN_output(y_train, t_train, verbose=True)
+bcg.get_score (events_truth, events_predicted, threshold=0.1)
 
 

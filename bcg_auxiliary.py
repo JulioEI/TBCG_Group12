@@ -9,21 +9,16 @@ import os
 """
 Auxiliary methods for loading the data and saving 
 the results from BrainCodeGames 2021 hackaton. 
-
 Methods
 -------
 load_data (path)
 	Loads LFP data for a session
-
 load_ripples_tags (path, fs)
 	Loads ripples start and end times (in seconds) for a session.
-
 get_ripples_tags_as_signal (data, ripples, fs)
 	Generates a pulse signal representing all the ripples tagged or predicted in a session.
-
 get_score (true_ripples, pred_ripples, threshold=0.1)
 	Calculates the precision, recall and F1 metrics for some detected events over the ground truth.
-
 write_results (save_path, session_name, group_number, predictions)
 	Saves the predicted ripples into a CSV file.
 """
@@ -70,7 +65,6 @@ def __load_raw_data (path, channels):
 
 def __iou (x, x_array=[]):
 	"""Implement the intersection over union (IoU) between x and x_array
-
 	Arguments:
 	x -- first segment, numpy array with coordinates (x_ini, x_end)
 	x_array -- second segment, numpy array with coordinates (x_array_ini, x_array_end)
@@ -105,12 +99,10 @@ def __iou (x, x_array=[]):
 def load_data (path):
 	"""
 	Loads the LFP signals from a session.
-
 	Parameters
 	----------
 	path : str
 		Path to the folder where the session data is located.
-
 	Returns
 	-------
 	data : Numpy array (n x 8)
@@ -120,12 +112,9 @@ def load_data (path):
 		Data sampling rate (in Hz).
 	session_name : str
 		String containing the name of the session.
-
-
 	Example
 	-------
 	data, fs, session_name = load_data("/myfolder/braincodegames/data/session1/")
-
 	"""
 
 	# Read info.mat
@@ -142,26 +131,21 @@ def load_data (path):
 def load_ripples_tags (path, fs):
 	"""
 	Loads the start and end times of all the ripples tagged in a session.
-
 	Parameters
 	----------
 	path : str
 		Path to the folder where the session data is located.
 	fs : int
 		Session data sampling rate (in Hz).
-
 	Returns
 	-------
 	ripples : Numpy array (n x 2)
 		Numpy array with the start and end times of the ripples (in seconds). 
 		It has n rows, one for each ripple, and 2 columns, for the start and 
 		end times respectively.
-
-
 	Example
 	-------
 	ripples_tags = load_ripples_tags("/myfolder/braincodegames/data/session1/", 30000)
-
 	"""
 
 	try:
@@ -180,7 +164,6 @@ def load_ripples_tags (path, fs):
 def get_ripples_tags_as_signal (data, ripples, fs):
 	"""
 	Generates a pulse signal representing all the ripples tagged or predicted in a session.
-
 	Parameters
 	----------
 	data: Numpy array (n x 2)
@@ -192,20 +175,16 @@ def get_ripples_tags_as_signal (data, ripples, fs):
 		start and end times respectively.
 	fs : int
 		Session data sampling rate (in Hz).
-
 	Returns
 	-------
 	signal : Numpy array (n x 1)
 		Numpy 1D vector containing a squared signal of duration n, as the number 
 		of rows in data. There will be a 1 for each timestep that contains a ripple,
 		or 0 otherwise.
-
-
 	Example
 	-------
 	signal_true = get_ripples_as_signal(data, true_ripples, fs)
 	signal_predicted = get_ripples_as_signal(data, pred_ripples, fs)
-
 	"""
 
 	signal = np.zeros(np.shape(data)[0])
@@ -222,7 +201,6 @@ def get_score (true_ripples, pred_ripples, threshold=0.1):
 	"""
 	Calculates the precision, recall and F1 metrics for some detected events
 	over the ground truth.
-
 	Parameters
 	----------
 	true_ripples : Numpy array (n x 2)
@@ -235,7 +213,6 @@ def get_score (true_ripples, pred_ripples, threshold=0.1):
 		start and end times respectively.
 	threshold : float
 		IoU threshold. Default=0.1 (Optional)
-
 	Returns
 	-------
 	precision : float
@@ -244,17 +221,16 @@ def get_score (true_ripples, pred_ripples, threshold=0.1):
 		Number of true ripples detected over total number of true ripples.
 	F1: float
 		Harmonic mean of precision and recall.
-
-
 	Example
 	-------
 	precision, recall, F1 = get_score(ripples_tags, detected_ripples)
-
 	"""
 
 	true_positives = 0
 	false_positives = 0
 	false_negatives = np.shape(true_ripples)[0]
+
+	true_events_found = np.zeros(np.shape(true_ripples)[0])
 
 	for i_event in range(np.shape(pred_ripples)[0]):
 		# Calculate IoU of the pred event with all true events
@@ -269,8 +245,10 @@ def get_score (true_ripples, pred_ripples, threshold=0.1):
 		best_iou_index = np.argmax(ious)
 		if ious[best_iou_index] >= threshold:
 			# If IoU >= threshold, it is a true positive. Remove from true events to find
-			false_negatives -= 1
-			true_positives += 1
+			if true_events_found[best_iou_index] == 0:
+				true_events_found[best_iou_index] = 1
+				false_negatives -= 1
+				true_positives += 1
 
 		else:
 			# If not, it is a false positive
@@ -289,7 +267,6 @@ def get_score (true_ripples, pred_ripples, threshold=0.1):
 def write_results (save_path, session_name, group_number, predictions):
 	"""
 	Writes the predictions for a session into a CSV file.
-
 	Parameters
 	----------
 	save_path : str
@@ -302,13 +279,10 @@ def write_results (save_path, session_name, group_number, predictions):
 		Numpy array the start and end times of the predicted ripples 
 		(in seconds). It has n rows, one for each prediction, and 2 
 		columns, for the start and end times respectively.
-
 	Example
 	-------
 	write_results("/myfolder/braincodegames/results/", "session1", 7, my_ripple_predictions)
-
 	"""
 
 	filename = save_path + "/Group" + str(group_number) + "_" + session_name + ".csv" 
 	np.savetxt(filename, predictions, delimiter=" ")
-
