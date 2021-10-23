@@ -41,7 +41,7 @@ def downsample(array, factor):
 
 def window_stack(a, stepsize, width):
     n = a.shape[0]
-    new_mat = np.zeros((np.ceil(n/stepsize).astype(int), width, a.shape[1]),dtype=np.int16)
+    new_mat = np.zeros((np.ceil((n-width)/stepsize).astype(int), width, a.shape[1]),dtype=np.int16)
     ind = 0
     for window in range(new_mat.shape[0]):
         new_mat[window,:,:] = np.expand_dims(a[ind:ind+width,:], axis=0)
@@ -51,7 +51,8 @@ def window_stack(a, stepsize, width):
             print(ind, ind+width, a.shape[0])
     return new_mat
 
-def window_stack(a, stepsize, width):
+
+"""def window_stack(a, stepsize, width):
     n = a.shape[0]
     new_mat = np.zeros((np.floor(n/stepsize).astype(int), width, a.shape[1]),dtype=np.int16)
     ind = 0
@@ -62,7 +63,7 @@ def window_stack(a, stepsize, width):
         except:
             print(ind, ind+width, a.shape[0])
             break
-    return new_mat
+    return new_mat"""
 
 data_Som2 = mov_av_downsample(data_Som2, down_sampling_factor)
 signal_Som2 = bcg.get_ripples_tags_as_signal(data_Som2, ripples_tags_Som2,desired_fs)
