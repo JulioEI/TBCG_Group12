@@ -5,6 +5,40 @@ Created on Sat Oct 23 14:54:31 2021
 @author: Julio
 """
 import numpy as np
+import bcg_auxiliary as bcg
+
+
+def zscore_signal(data,axis=0):
+    std_ch = np.std(data,axis=axis)
+    mean_ch = np.mean(data, axis=axis)
+    
+    for ch in range(data.shape[1]):
+        data[:,ch] = (data[:,ch]-mean_ch[ch])/std_ch[ch]
+    return data
+    
+
+def load_data_pipeline(datapath, desired_fs=1250, window_seconds = 0.04, overlapping = 0.6, zscore = True):
+    #load x-data
+    data, fs, session_name = bcg.load_data(datapath)
+    #load y-data
+    ripples_tags = bcg.load_ripples_tags(datapath, fs)
+    
+    
+    down_sampling_factor =int(fs/desired_fs)
+    window_size = int(desired_fs*window_seconds)
+    
+    
+    data = mov_av_downsample(data, down_sampling_factor) #downsample x-data
+    
+    if zscore:
+        data = zscore_signal(data,axis=0)
+        
+    signal = bcg.get_ripples_tags_as_signal(data, ripples_tags,desired_fs) 
+    x_train, indx_map = adapt_input_to_CNN(data, window_size, overlapping)
+    y_train = adapt_label_to_CNN(signal, window_size, overlapping)
+    
+    return data, ripples_tags, signal, x_train, y_train, indx_map
+
 
 def mov_av_downsample(array, win):
     desired_length = int(win*np.ceil(array.shape[0]/win))

@@ -15,39 +15,25 @@ sys.path.append(path_to_module)
 import utils as ut
 
 
-datapath = "../data/Som2"
-data_Som2, fs, session_name_Som2 = bcg.load_data(datapath)
-n_ch = data_Som2.shape[1]
-ripples_tags_Som2 = bcg.load_ripples_tags(datapath, fs)
-
-datapath = "../data/Amigo2"
-data_Amigo2, fs, session_name_Amigo2 = bcg.load_data(datapath)
-ripples_tags_Amigo2 = bcg.load_ripples_tags(datapath, fs)
-
-#downsample
-desired_fs = 1250
+fs=1250
 window_seconds = 0.04 #seconds
 overlapping = 0.6
 
-down_sampling_factor =int(fs/desired_fs)
-window_size = int(desired_fs*window_seconds)
-input_shape = (window_size,n_ch,1)
+datapath = "../data/Som2"
+data_Som2, ripples_tags_Som2, signal_Som2, x_train_Som2, y_train_Som2, indx_map_Som2 = ut.load_data_pipeline(
+    datapath, desired_fs=fs, window_seconds = window_seconds, overlapping = overlapping, zscore=True)
 
-data_Som2 = ut.mov_av_downsample(data_Som2, down_sampling_factor)
-signal_Som2 = bcg.get_ripples_tags_as_signal(data_Som2, ripples_tags_Som2,desired_fs)
-x_train_Som2, indx_map_Som2 = ut.adapt_input_to_CNN(data_Som2, window_size, overlapping)
-y_train_Som2 = ut.adapt_label_to_CNN(signal_Som2, window_size, overlapping)
+datapath = "../data/Amigo2"
+data_Amigo2, ripples_tags_Amigo2, signal_Amigo2, x_train_Amigo2, y_train_Amigo2, indx_map_Amigo2 = ut.load_data_pipeline(
+    datapath, desired_fs=fs, window_seconds = window_seconds, overlapping = overlapping, zscore= True)
 
-data_Amigo2 = ut.mov_av_downsample(data_Amigo2, down_sampling_factor)
-signal_Amigo2 = bcg.get_ripples_tags_as_signal(data_Amigo2, ripples_tags_Amigo2, desired_fs)
-x_train_Amigo2, indx_map_Amigo2 = ut.adapt_input_to_CNN(data_Amigo2, window_size, overlapping)
-y_train_Amigo2 = ut.adapt_label_to_CNN(signal_Amigo2, window_size, overlapping)
-
-fs = desired_fs
 
 
 from tensorflow.keras.models import Sequential
 from tensorflow.keras import layers, optimizers
+
+n_ch = data_Som2.shape[1]
+input_shape = (int(fs*window_seconds),n_ch,1)
 
 
 
