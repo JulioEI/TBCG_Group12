@@ -17,7 +17,7 @@ def zscore_signal(data,axis=0):
     return data
     
 
-def load_data_pipeline(datapath, desired_fs=1250, window_seconds = 0.04, overlapping = 0.6, zscore = True):
+def load_data_pipeline(datapath, desired_fs=1250, window_seconds = 0.04, overlapping = 0.6, zscore = True, binary = False):
     #load x-data
     data, fs, session_name = bcg.load_data(datapath)
     #load y-data
@@ -35,7 +35,10 @@ def load_data_pipeline(datapath, desired_fs=1250, window_seconds = 0.04, overlap
         
     signal = bcg.get_ripples_tags_as_signal(data, ripples_tags,desired_fs) 
     x_train, indx_map = adapt_input_to_CNN(data, window_size, overlapping)
-    y_train = adapt_label_to_CNN(signal, window_size, overlapping)
+    if binary:
+        y_train = adapt_input_to_CNN(signal, window_size, overlapping)
+    else:
+        y_train = adapt_label_to_CNN(signal, window_size, overlapping)
     
     return data, ripples_tags, signal, x_train, y_train, indx_map
 
