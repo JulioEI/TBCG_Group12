@@ -2,28 +2,19 @@
 """
 Created on Sun Oct 24 02:13:57 2021
 
-@author: Usuario
+@author: Julio Esparza
 """
 
-# -*- coding: utf-8 -*-
-"""
-Created on Sun Oct 24 01:22:22 2021
-
-@author: Usuario
-"""
-
-
-import bcg_auxiliary as bcg
-#import matplotlib.pyplot as plt
+## CHANGE DIRECTORY TO 'TBCG_SocioAstros' FOLDER
+import os
 import numpy as np
 
-import sys
-path_to_module = r"E:\\Users\Usuario\\Documents\\TheBrainCodeGame\\TBCG_SocioAstros\\"
-sys.path.append(path_to_module)
 import utils as ut
 import model_builders as mb
+import bcg_auxiliary as bcg
 
-import os 
+
+
 
 fs=1250
 window_seconds = 0.05 #seconds
@@ -97,10 +88,10 @@ else:
         model = mb.model_builder_prob(filters_Conv1 = 32, filters_Conv2 = 16, filters_Conv3=8, filters_Conv4 = 16,
                           filters_Conv5 =16, filters_Conv6=8, input_shape = input_shape, 
                           learning_rate  = 1e-5)
-        checkpoint_path = "../training_cp/training_prob_v3/cp-{epoch:04d}.ckpt"
+        checkpoint_path = "../training_cp/training_prob_vf2/cp-{epoch:04d}.ckpt"
 
 checkpoint_dir = os.path.dirname(checkpoint_path)
-save_freq = int(25*np.ceil(x_train.shape[0]/batch_size))
+save_freq = int(5*np.ceil(x_train.shape[0]/batch_size))
 cp_callback = ModelCheckpoint(
     filepath=checkpoint_path, 
     verbose=1, 
@@ -111,10 +102,28 @@ cp_callback = ModelCheckpoint(
 ###############################################################################
 #                                  TRAIN CNN                                  #
 ###############################################################################
- ## MERGE ALL DATA ##
- 
-
-model.fit(x_train,y_train, shuffle = True, epochs = 1000, batch_size = batch_size, 
+model.fit(x_train,y_train, shuffle = True, epochs = 5000, batch_size = batch_size, 
           callbacks=[cp_callback], validation_data = (x_validation, y_validation))
 model.save_weights(checkpoint_path)
+# Save model
+model.save('/model/model_prob_vf.h5')
+###############################################################################
+#                            EVALUATE CNN OUTPUT                              #
+###############################################################################
+y_prediction_Dlx1 = model.predict(x_validation_Dlx1)
+y_prediction_Thy7 = model.predict(x_validation_Thy7)
+
+events_prediction_Dlx1 = ut.get_ripple_times_from_CNN_output(y_prediction_Dlx1, 
+                                     indx_map_Dlx1, th_zero = 5e-1, th_dur = 0.01, verbose = False)
+
+events_prediction_Thy7 = ut.get_ripple_times_from_CNN_output(y_prediction_Thy7,
+                                     indx_map_Thy7, th_zero = 5e-1, th_dur = 0.01, verbose = False)
+
+P_Dlx1, R_Dlx1, F1_Dlx1 = bcg.get_score(ripples_tags_Dlx1, events_prediction_Dlx1, threshold=0.1)
+print("Dlx1: ", P_Dlx1, R_Dlx1, F1_Dlx1)
+
+P_Thy7, R_Thy7, F1_Thy7 = bcg.get_score(ripples_tags_Thy7, events_prediction_Thy7, threshold=0.1)
+print("Thy7: ", P_Thy7, R_Thy7, F1_Thy7)
+
+
 

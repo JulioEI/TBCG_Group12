@@ -43,6 +43,20 @@ def load_data_pipeline(datapath, desired_fs=1250, window_seconds = 0.04, overlap
     return data, ripples_tags, signal, x_train, y_train, indx_map
 
 
+def load_test_data_pipeline(datapath, desired_fs=1250, window_seconds = 0.04, overlapping = 0.6, zscore = True, binary = False):
+    #load x-data
+    data, fs, session_name = bcg.load_data(datapath)
+    down_sampling_factor =int(fs/desired_fs)
+    window_size = int(desired_fs*window_seconds)
+    
+    data = mov_av_downsample(data, down_sampling_factor) #downsample x-data
+    if zscore:
+        data = zscore_signal(data,axis=0)        
+    x_train, indx_map = adapt_input_to_CNN(data, window_size, overlapping)
+    
+    return data, x_train, indx_map
+
+
 def mov_av_downsample(array, win):
     desired_length = int(win*np.ceil(array.shape[0]/win))
     array = np.pad(array.astype(float), ((0, desired_length-array.shape[0]), (0, 0)), 
@@ -128,6 +142,6 @@ def get_ripple_times_from_CNN_output(y_predicted, t_predicted, fs=1250, verbose 
                     events = np.array([st_pt, en_pt]).T
                 else:
                     events = np.vstack((events, np.array([st_pt[0], en_pt[0]])))
-    return events
+    return events/fs
 
 
