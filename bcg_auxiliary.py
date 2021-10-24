@@ -241,7 +241,7 @@ def get_score (true_ripples, pred_ripples, threshold=0.1):
 			# There are no ground truths so it is a false positive
 			false_positives += 1
 			continue
-
+        
 		best_iou_index = np.argmax(ious)
 		if ious[best_iou_index] >= threshold:
 			# If IoU >= threshold, it is a true positive. Remove from true events to find

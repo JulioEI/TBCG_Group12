@@ -26,11 +26,12 @@ import model_builders as mb
 import os 
 
 fs=1250
-window_seconds = 0.04 #seconds
-overlapping = 0.6
+window_seconds = 0.05 #seconds
+overlapping = 0.7
 batch_size = 32
 learning_rate = 1e-5
-binary = True
+binary = False
+Unet = False
 
 ###############################################################################
 #                               TRAINING DATA                                 #
@@ -45,7 +46,7 @@ datapath = "../data/Som2"
 data_Som2, ripples_tags_Som2, signal_Som2, x_train_Som2, y_train_Som2, indx_map_Som2 = ut.load_data_pipeline(
     datapath, desired_fs=fs, window_seconds = window_seconds, overlapping = overlapping, zscore=True, binary = binary)
 
-### MERGE TRAIN DATA ###
+### MERGE TRAINING DATA ###
 x_train = np.vstack((x_train_Amigo2, x_train_Som2))
 if binary:
     y_train = np.vstack((y_train_Amigo2, y_train_Som2))
@@ -58,12 +59,12 @@ indx_map_train = np.vstack((indx_map_Amigo2, indx_map_Som2))
 ###############################################################################
 ### LOAD VALIDATION DATA ###
 datapath = "../data/Dlx1"
-data_Som2, ripples_tags_Dlx1, signal_Dlx1, x_validation_Dlx1, y_validation_Dlx1, indx_map_Dlx1 = ut.load_data_pipeline(
-    datapath, desired_fs=fs, window_seconds = window_seconds, overlapping = overlapping, zscore=True, binary = True)
+data_Dlx1, ripples_tags_Dlx1, signal_Dlx1, x_validation_Dlx1, y_validation_Dlx1, indx_map_Dlx1 = ut.load_data_pipeline(
+    datapath, desired_fs=fs, window_seconds = window_seconds, overlapping = overlapping, zscore=True, binary = binary)
 
 datapath = "../data/Thy7"
-data_Som2, ripples_tags_Thy7, signal_Thy7, x_validation_Thy7, y_validation_Thy7, indx_map_Thy7 = ut.load_data_pipeline(
-    datapath, desired_fs=fs, window_seconds = window_seconds, overlapping = overlapping, zscore=True, binary = True)
+data_Thy7, ripples_tags_Thy7, signal_Thy7, x_validation_Thy7, y_validation_Thy7, indx_map_Thy7 = ut.load_data_pipeline(
+    datapath, desired_fs=fs, window_seconds = window_seconds, overlapping = overlapping, zscore=True, binary = binary)
 
 ### MERGE VALIDATION DATA ###
 x_validation = np.vstack((x_validation_Dlx1, x_validation_Thy7))
@@ -74,25 +75,46 @@ else:
 indx_map_validation = np.vstack((indx_map_Dlx1, indx_map_Thy7))
 
 ###############################################################################
-#                            CNN HP EXPLORATION                               #
+#                                CNN BUILDING                                 #
 ###############################################################################
+
+from tensorflow.keras.callbacks import ModelCheckpoint
 n_ch = data_Som2.shape[1]
 input_shape = (int(fs*window_seconds),n_ch,1)
 
-model = mb.model_builder_binary(filters_Conv1 = 32, filters_Conv2 = 16, filters_Conv3=8, filters_Conv4 = 16,
-                  filters_Conv5 =16, units_Dense = 60, input_shape = (50,8,1),
-                  learning_rate = 1e-5)
+if binary:
+    model = mb.model_builder_binary(filters_Conv1 = 32, filters_Conv2 = 16, filters_Conv3=8, filters_Conv4 = 16,
+                      filters_Conv5 =16, units_Dense = 60, input_shape = input_shape,
+                      learning_rate = 1e-5)
+    checkpoint_path = "../training_cp/training_binary_v1/cp-{epoch:04d}.ckpt"
 
+else:
+    if Unet:
+        model= mb.model_builder_Unet(filters_Conv1 = 10, filters_Conv2 = 15, filters_Conv3=15, filters_Conv4 = 15,
+                               input_shape = input_shape, learning_rate  = 1e-4)
+        checkpoint_path = "../training_cp/training_unet_v1/cp-{epoch:04d}.ckpt"
+    else:
+        model = mb.model_builder_prob(filters_Conv1 = 32, filters_Conv2 = 16, filters_Conv3=8, filters_Conv4 = 16,
+                          filters_Conv5 =16, filters_Conv6=8, input_shape = input_shape, 
+                          learning_rate  = 1e-5)
+        checkpoint_path = "../training_cp/training_prob_v3/cp-{epoch:04d}.ckpt"
 
+checkpoint_dir = os.path.dirname(checkpoint_path)
+save_freq = int(25*np.ceil(x_train.shape[0]/batch_size))
+cp_callback = ModelCheckpoint(
+    filepath=checkpoint_path, 
+    verbose=1, 
+    save_weights_only=True,
+    save_freq=save_freq
+ )
 
-stop_early = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
-tuner.search(x_train, y_train, epochs=10, validation_data = (x_validation, y_validation), callbacks=[stop_early])
+###############################################################################
+#                                  TRAIN CNN                                  #
+###############################################################################
+ ## MERGE ALL DATA ##
+ 
 
-# Get the optimal hyperparameters
-best_hps=tuner.get_best_hyperparameters(num_trials=1)[0]
+model.fit(x_train,y_train, shuffle = True, epochs = 1000, batch_size = batch_size, 
+          callbacks=[cp_callback], validation_data = (x_validation, y_validation))
+model.save_weights(checkpoint_path)
 
-print(f"""
-The hyperparameter search is complete. The optimal number of units in the first densely-connected
-layer is {best_hps.get('units')} and the optimal learning rate for the optimizer
-is {best_hps.get('learning_rate')}.
-""")

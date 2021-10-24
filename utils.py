@@ -36,7 +36,7 @@ def load_data_pipeline(datapath, desired_fs=1250, window_seconds = 0.04, overlap
     signal = bcg.get_ripples_tags_as_signal(data, ripples_tags,desired_fs) 
     x_train, indx_map = adapt_input_to_CNN(data, window_size, overlapping)
     if binary:
-        y_train = adapt_input_to_CNN(signal, window_size, overlapping)
+        y_train = window_stack(signal,int((1-overlapping)*window_size), window_size)
     else:
         y_train = adapt_label_to_CNN(signal, window_size, overlapping)
     
@@ -80,13 +80,15 @@ def adapt_label_to_CNN(array, window_size, overlapping):
     return np.squeeze(np.sum(label, axis=1)/window_size)
 
 
-def get_ripple_times_from_CNN_output(y_predicted, t_predicted, fs=1250, verbose = False):
+def get_ripple_times_from_CNN_output(y_predicted, t_predicted, fs=1250, verbose = False,
+                                     th_zero = 3e-1, th_dur = 0.2):
     events = np.array([])
     window = 0
     while window < y_predicted.shape[0]:
-        if y_predicted[window] == 0: #if no ripple detected on this window jump to the next
+        if y_predicted[window] <= th_zero: #if no ripple detected on this window jump to the next
             window += 1
         else: #ripple starts
+            flag_dur = 0
             st_pt = t_predicted[window,int(-y_predicted[window]*t_predicted.shape[1]),:]
             if verbose:
                 print('\nStart ripple: ', window, '(', st_pt[0]/fs, 's)')
@@ -99,24 +101,33 @@ def get_ripple_times_from_CNN_output(y_predicted, t_predicted, fs=1250, verbose 
                     print('Computing end of ripple: ')
                 ripple_end = 0
                 window+=1
+                count = 1
                 while ripple_end == 0:
                     if verbose:
                         print('\tripple still going on: ', window)
-                    if y_predicted[window] == 0:
-                        en_pt = t_predicted[window-1, int(y_predicted[window-1]*t_predicted.shape[1]-1),:]
+                    if y_predicted[window] <= th_zero:
+                        if count>1:
+                            en_pt = t_predicted[window-1, int(y_predicted[window-1]*t_predicted.shape[1]-1),:]
+                        elif y_predicted[window-1]< th_dur:
+                            flag_dur = 1
+                            if verbose:
+                                print('\tripple too short, discarding: ', y_predicted[window-1])
+                        else:
+                            st_pt = t_predicted[window-1, int(0.5*(1-y_predicted[window-1])*t_predicted.shape[1]),:]
+                            en_pt = t_predicted[window-1, -int(0.5*(1-y_predicted[window-1])*t_predicted.shape[1]-1),:]
+                            
                         ripple_end = 1 
                     if window+1==y_predicted.shape[0]: #last window
                          en_pt = t_predicted[window, int(y_predicted[window-1]*t_predicted.shape[1]-1), :]   
                          ripple_end = 1
                     window +=1
+            if flag_dur == 0:
                 if verbose: 
                     print("\tend of ripple: ", window-1, '(', en_pt[0]/fs, 's)')
-
-            if events.shape[0]==0: #first ripple detected
-                events = np.array([st_pt, en_pt]).T
-            else:
-                events = np.vstack((events, np.array([st_pt[0], en_pt[0]])))
-                
+                if events.shape[0]==0: #first ripple detected   
+                    events = np.array([st_pt, en_pt]).T
+                else:
+                    events = np.vstack((events, np.array([st_pt[0], en_pt[0]])))
     return events
 
 

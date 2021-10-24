@@ -128,13 +128,13 @@ def model_builder(hp):
     model.compile(
         optimizer= optimizers.Adam(learning_rate=1e-5), 
         loss='mean_absolute_error', 
-        metrics=['accuracy']  
+        metrics=['mean_squared_error']  
     )
 
     return model
 
 tuner = kt.Hyperband(model_builder,
-                     objective=kt.Objective('val_F1', direction="max"),
+                     objective='val_loss',
                      max_epochs=10,
                      factor=3,
                      directory='my_dir',
@@ -142,7 +142,7 @@ tuner = kt.Hyperband(model_builder,
 
 
 stop_early = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=5)
-tuner.search(x_train, y_train, epochs=50, validation_data = (x_validation, y_validation), callbacks=[stop_early])
+tuner.search(x_train, y_train, epochs=10, validation_data = (x_validation, y_validation), callbacks=[stop_early])
 
 # Get the optimal hyperparameters
 best_hps=tuner.get_best_hyperparameters(num_trials=1)[0]
