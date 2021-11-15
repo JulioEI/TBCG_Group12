@@ -5,7 +5,7 @@ Created on Sun Oct 24 02:13:57 2021
 @author: Julio Esparza
 """
 
-## CHANGE DIRECTORY TO 'TBCG_SocioAstros' FOLDER
+## CHANGE DIRECTORY TO 'code' FOLDER
 import os
 import numpy as np
 
@@ -14,21 +14,27 @@ import model_builders as mb
 import bcg_auxiliary as bcg
 
 
+###############################################################################
+#                              GENERAL PARAMETERS                             #
+###############################################################################
+fs=1250 #sampling frequency after downsampling
+window_seconds = 0.05 #window length in seconds
+overlapping = 0.7 #window overlapping
+batch_size = 32 #batch size
+learning_rate = 1e-5 #learning rate
+epochs = 300 #number of training epochs
 
-
-fs=1250
-window_seconds = 0.05 #seconds
-overlapping = 0.7
-batch_size = 32
-learning_rate = 1e-5
-binary = False
-Unet = False
-
+###############################################################################
+#                                SELECT MODEL                                 #
+###############################################################################
+binary = False #predict only binary for each window (whether there is or is not a ripple)
+Unet = False #architecture lossely based on unet
+prob_NANI = True #(by Default) predict probability for each window (gicen by the # of points inside the window which are ripples)
 ###############################################################################
 #                               TRAINING DATA                                 #
 ###############################################################################
 
-### LOAD TRAIN DATA ###
+### LOAD TRAIN DATA and PREPROCESS IT (downsampling, zscore, create windows)###
 datapath = "../data/Amigo2"
 data_Amigo2, ripples_tags_Amigo2, signal_Amigo2, x_train_Amigo2, y_train_Amigo2, indx_map_Amigo2 = ut.load_data_pipeline(
     datapath, desired_fs=fs, window_seconds = window_seconds, overlapping = overlapping, zscore= True, binary = binary)
@@ -79,19 +85,19 @@ if binary:
                       learning_rate = 1e-5)
     checkpoint_path = "../training_cp/training_binary_v1/cp-{epoch:04d}.ckpt"
 
-else:
-    if Unet:
+elif Unet:
         model= mb.model_builder_Unet(filters_Conv1 = 10, filters_Conv2 = 15, filters_Conv3=15, filters_Conv4 = 15,
                                input_shape = input_shape, learning_rate  = 1e-4)
         checkpoint_path = "../training_cp/training_unet_v1/cp-{epoch:04d}.ckpt"
-    else:
+elif prob_NANI:
         model = mb.model_builder_prob(filters_Conv1 = 32, filters_Conv2 = 16, filters_Conv3=8, filters_Conv4 = 16,
                           filters_Conv5 =16, filters_Conv6=8, input_shape = input_shape, 
                           learning_rate  = 1e-5)
-        checkpoint_path = "../training_cp/training_prob_vf2/cp-{epoch:04d}.ckpt"
+        checkpoint_path = "../training_cp/training_prob_vf/cp-{epoch:04d}.ckpt"
 
+#create checkpoint save method
 checkpoint_dir = os.path.dirname(checkpoint_path)
-save_freq = int(5*np.ceil(x_train.shape[0]/batch_size))
+save_freq = int(25*np.ceil(x_train.shape[0]/batch_size))
 cp_callback = ModelCheckpoint(
     filepath=checkpoint_path, 
     verbose=1, 
@@ -102,7 +108,7 @@ cp_callback = ModelCheckpoint(
 ###############################################################################
 #                                  TRAIN CNN                                  #
 ###############################################################################
-model.fit(x_train,y_train, shuffle = True, epochs = 5000, batch_size = batch_size, 
+model.fit(x_train,y_train, shuffle = True, epochs = epochs, batch_size = batch_size, 
           callbacks=[cp_callback], validation_data = (x_validation, y_validation))
 model.save_weights(checkpoint_path)
 # Save model
