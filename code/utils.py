@@ -74,7 +74,6 @@ def window_stack(a, stepsize, width):
     for window in range(new_mat.shape[0]):
         if ind+width>n_t:
             ind = n_t-width
-            print(ind, ind+width, a.shape[0])
         new_mat[window,:,:] = np.expand_dims(a[ind:ind+width,:], axis=0)
         ind = ind+stepsize
     return new_mat
